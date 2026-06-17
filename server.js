@@ -267,32 +267,36 @@ app.get("/tipos-diagnostico/eliminar/:id", (req, res) => {
 
 //  CONSULTAS
 
-app.get("/consulta-hospitalizados", (req, res) => {
+app.get("/consulta-disponibilidad", (req, res) => {
     bd.query(
-        `SELECT p.nombre, p.apellido, t.nombre AS diagnostico, 
-                h.fecha_ingreso, s.nombre AS sala
-         FROM hospitalizacion h
-         JOIN paciente p ON h.paciente_id = p.id
-         JOIN sala s ON h.sala_id = s.id
-         JOIN tipo_diagnostico t ON p.tipo_diagnostico_id = t.id
-         WHERE h.fecha_alta IS NULL`,
+        `SELECT s.nombre AS sala, s.capacidad,
+                COUNT(h.id) AS ocupados,
+                (s.capacidad - COUNT(h.id)) AS disponibles
+         FROM sala s
+         LEFT JOIN hospitalizacion h 
+                ON h.sala_id = s.id AND h.fecha_alta IS NULL
+         GROUP BY s.id`,
         (err, datos) => {
             if (err) return res.status(500).send("Error en consulta");
-            res.render("consultas/hospitalizados", { lista: datos });
+            res.render("consultas/disponibilidad", { lista: datos });
         }
     );
 });
 
-app.get("/consulta-por-sala", (req, res) => {
+app.get("/consulta-buscar", (req, res) => {
+    const nombre = req.query.nombre || "";
     bd.query(
-        `SELECT s.nombre AS sala, COUNT(h.id) AS total
-         FROM hospitalizacion h
-         JOIN sala s ON h.sala_id = s.id
-         WHERE h.fecha_alta IS NULL
-         GROUP BY s.id`,
+        `SELECT p.id, p.nombre, p.apellido, t.nombre AS diagnostico,
+                h.fecha_ingreso, h.fecha_alta, s.nombre AS sala
+         FROM paciente p
+         JOIN tipo_diagnostico t ON p.tipo_diagnostico_id = t.id
+         LEFT JOIN hospitalizacion h ON h.paciente_id = p.id
+         LEFT JOIN sala s ON h.sala_id = s.id
+         WHERE p.nombre LIKE ? OR p.apellido LIKE ?`,
+        [`%${nombre}%`, `%${nombre}%`],
         (err, datos) => {
             if (err) return res.status(500).send("Error en consulta");
-            res.render("consultas/por_sala", { lista: datos });
+            res.render("consultas/buscar", { lista: datos, busqueda: nombre });
         }
     );
 });
